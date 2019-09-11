@@ -1,0 +1,201 @@
+---
+fontsize: 12pt
+geometry: margin=0.25in
+toc: yes
+title: Zika CRISPR library analysis
+author: Everett JK & Bushman FD
+date: March 16, 2018
+output:
+  pdf_document:
+    keep_tex: no
+    latex_engine: xelatex
+---
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2)
+library(pander)
+library(knitr)
+library(kableExtra)
+library(xtable)
+load('savePoints/project.RData')
+
+ppNum <- function(n) format(n,big.mark=",", scientific=FALSE, trim=TRUE) 
+ppPercent <- function(n) paste0(sprintf("%.2f", n*100), '%')
+
+```
+
+# Data processing  
+
+`r ppNum(report$totalReads)` filtered reads were acquired from the provided samples which employed a dual barcoding 
+strategy. Two different barcode codes were used to track sample conditions (GTGCGTAA -> Uninfected and CTATTCAA -> Zika infected) while an additional 10 barcodes were used to track sample replicates.  
+
+\vspace{0.5cm}
+
+The forward are reverse reads were combined into single combined reads with the PEAR software suite 
+which requires a minimum of 30 NT overlap between paired-end reads. Examination of multiply aligned 
+sequences revealed that the guide sequences could be readily excised by extracting sequences between 
+the constant flanking vector sequences CGAAACACC and GTTTTAGAG. The first flanking sequence was 
+found in `r report$percentBoundary1Found`% of sequences, the second flanking sequence was found in 
+`r report$percentBoundary2Found`% sequences and both flanking sequences were found in `r report$percentBothBoundariesFound`%
+sequences. No mismatches were allowed while identifying the flanking sequence positions.  
+
+\vspace{0.5cm}
+
+# Guide sequence characterization  
+
+## Guide sequence length distributions  
+Identified guide sequences show a distribution of lengths centered at 20 nucleotides (Figure 1). 
+The tails of this distribution are shown in Figure 2 where guide sequences with lengths of 16-21 nucleotides 
+were omitted. The 'Unknown' condition refers to reads with barcodes that did not map to one of the 
+three experimental conditions either because of read quality or use of unknown barcodes. 
+
+\newpage
+
+*Figure 1*  
+
+```{r F1, echo=FALSE, dev='png', dpi=150, fig.height=4, warning=FALSE, message=FALSE}
+guideSeqLengthPlot1
+```
+  
+  
+*Figure 2*  
+
+```{r F2, echo=FALSE, dev='png', dpi=150, fig.height=3, warning=FALSE, message=FALSE}
+guideSeqLengthPlot2
+```
+
+\vspace{0.5cm}
+
+## Guide sequence statistics  
+
+`r stats$expected.percentSeqs.20` of the identified 20 NT guide sequences were found in the library of 
+`r ppNum(length(unique(expectedGuides$guideSeq)))` expected guide sequences while 
+`r stats$expected.percentReads.20` of the reads mapped to the expected sequences. 
+`r sprintf("%.2f", (sum(unique(guideSeqs$guideSeq) %in% expectedGuides$guideSeq) / length(expectedGuides$guideSeq))*100)`% 
+of the expected guide sequences were identified in the sequencing experiments. *Only reads that correspond to the expected guide sequences were considered in the following analysis.* 
+Rarefaction analysis (Figure 3) shows that the identification of unique guide sequences in each condition approaches saturation.  
+
+\newpage
+
+*Figure 3*  
+
+```{r F3, echo=FALSE, dev='png', dpi=150,  fig.height=4, warning=FALSE, message=FALSE}
+rarificationPlot
+```
+
+# Guide sequence enrichment  
+
+## Enrichment of specific guide sequences  
+
+The number of reads for each unique guide sequence were tallied and Fisher's exact tests (one tailed towards Zika enrichment) were calculated for each guide sequence. 
+The read frequencies of each guide (*n* reads for guide *G* in condition *C* / all reads in condition *C*) were calculated and are shown as a bivariate 
+plot in Figure 4 revealing that guides targeting Z3HAV1 and FBXW2 appear to be highly enriched in the uninfected condition.  
+
+\vspace{0.25cm}
+
+*Figure 4*  
+
+```{r F4, echo=FALSE, dev='png', dpi=150,  fig.height=3.5, warning=FALSE, message=FALSE}
+guideSeqs.seqAgg.tests.plot1
+```
+
+\newpage
+
+Figure 5 focuses on the lower left corner of Figure 4 and colors the guide sequence data points by their Fisher's exact 
+statistics. Sequences enriched in the Zika infected condition can be grouped by different components of the Fisher's exact test results. 
+From least to most conservative, enriched sequences can be considered to be those with a p-value $\leq$ 1e-4 (arbitrary value), 
+those with a odds ratio of $\leq$ 1/2 or those with an odds ratio 95% confidence interval upper limit (OR_95CI_UL) $\leq$ 1/2. 
+Table 1 shows the number of enriched guides obtained with each cut-off.  
+
+\vspace{0.5cm}
+
+*Figure 5*  
+
+```{r F5, echo=FALSE, dev='png', dpi=150,  fig.height=3.5, warning=FALSE, message=FALSE}
+guideSeqs.seqAgg.tests.plot2
+```
+
+\vspace{0.5cm}
+
+*Table 1*  
+
+```{r T1,echo=FALSE, results='asis'}
+o <- data.frame('  pval $\\leq$ 1e-4  ' = sum(guideSeqs.seqAgg.tests$pval <= 1e-4), 
+                '  odds ratio $\\leq$ 1/3  ' = sum(guideSeqs.seqAgg.tests$oddsRatio <= 1/3),
+                '  odds ratio $\\leq$ 1/4  ' = sum(guideSeqs.seqAgg.tests$oddsRatio <= 1/4),
+                '  OR_95CI_UL $\\leq$ 1/2  ' = sum(guideSeqs.seqAgg.tests$confInt95End <= 1/2),
+                '  OR_95CI_UL $\\leq$ 1/3  ' = sum(guideSeqs.seqAgg.tests$confInt95End <= 1/3),
+                check.names = FALSE)
+
+row.names(o) <- 'Guide seqs'
+kable(o)
+```
+
+\vspace{0.5cm}
+
+## Enrichment of guides targeting specific genes  
+
+Alternatively, the enrichment of guides targeting specific genes can be evaluated (Figures 6 & 7) and 
+the number of unique genes enriched can be tallied (Table 2).
+
+\newpage
+
+*Figure 6*  
+
+```{r F6, echo=FALSE, dev='png', dpi=150,  fig.height=3.5, warning=FALSE, message=FALSE}
+guideSeqs.geneAgg.tests.plot1
+```
+
+\vspace{0.5cm}
+
+*Figure 7*  
+
+```{r F7, echo=FALSE, dev='png', dpi=150,  fig.height=3.5, warning=FALSE, message=FALSE}
+guideSeqs.geneAgg.tests.plot2
+```
+
+\vspace{0.5cm}
+
+*Table 2*  
+
+```{r T2, echo=FALSE, results='asis'}
+o <- data.frame('  pval $\\leq$ 1e-3  '      = sum(guideSeqs.geneAgg.tests$pval <= 1e-3), 
+                '  odds ratio $\\leq$ 1/2  ' = sum(guideSeqs.geneAgg.tests$oddsRatio <= 1/2),
+                '  odds ratio $\\leq$ 1/3  ' = sum(guideSeqs.geneAgg.tests$oddsRatio <= 1/3),
+                '  OR_95CI_UL $\\leq$ 1/2  ' = sum(guideSeqs.geneAgg.tests$confInt95End <= 1/2),
+                check.names = FALSE)
+row.names(o) <- 'Targeted genes'
+
+kable(o)
+```
+
+\newpage
+
+# Data files  
+
+The full output of the Fisher's exact tests are available on-line (UPenn file sharing service).  
+  
+[[Enrichment of guide sequences]](https://upenn.box.com/shared/static/luk144x4a50eldh6k2nswk21fhb6orkk.csv)  
+[[Enrichment of targeted genes]](https://upenn.box.com/shared/static/221gwye1syqv62r3ct135wn9kq5ah5y0.csv)  
+
+\vspace{0.5cm}
+
+# GO term enrichment  
+
+Table 3 below details the result of a GO term enrichment analysis (Fatigo) using the gene names from the 
+guide sequence enrichment where a cut-off of Fisher's exact odd ratio of $\leq$ 1/4 was used (Table 1, `r sum(guideSeqs.seqAgg.tests$oddsRatio <= 1/4)` genes). 
+The full analysis output which includes the enriched gene names can be [[downloaded here]](https://upenn.box.com/shared/static/7rplom9lk6gvp7bip14tt5pqlrnk6mtt.fatigo). 
+Fatigo is a free, web-based tool (http://babelomics.bioinfo.cipf.es) for studying gene enrichment. Further use of this tool with the gene names provided in the 
+linked data files may prove insightful.
+
+\vspace{0.5cm}
+
+*Table 3. Results of GO term enrichment analysis*  
+
+```{r, echo=FALSE}
+fatigo  <- read.table('data/seqAgg.OR_0.25.genes.fatigo', sep = '\t', comment.char = '', quote = '', header = TRUE)
+fatigo2 <- dplyr::select(fatigo, term, adj_pvalue)
+fatigo2 <- fatigo2[order(fatigo2$adj_pvalue),]
+
+kable(fatigo2, row.names = FALSE)
+```
